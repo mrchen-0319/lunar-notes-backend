@@ -41,18 +41,29 @@ self.addEventListener("fetch", (e) => {
 
 // 后台推送：即使 PWA 关闭也会触发（需部署了支持 Web Push 的后端 server.py）
 self.addEventListener("push", (e) => {
-  let data = { title: "农历提醒", body: "" };
+  let data = { title: "农历提醒", body: "", url: "./" };
   try { data = JSON.parse(e.data.text()); } catch (_) {}
+  // iOS 对相对路径图标解析不稳定，统一用 service worker 作用域拼成绝对地址
+  const scope = self.registration.scope;
+  const icon = new URL("icon-512.png", scope).href;
+  const badge = new URL("icon-192.png", scope).href;
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "./icon-512.png",
-      badge: "./icon-192.png",
+    self.registration.showNotification(data.title || "农历提醒", {
+      body: data.body || "",
+      icon,
+      badge,
+      tag: "lunar-notes",     // 同类通知聚合，避免刷屏
+      renotify: true,         // 同 tag 也重新提示，确保锁屏可见
+      requireInteraction: true, // 尽量保持可见
+      vibrate: [200, 100, 200],
+      timestamp: Date.now(),
+      data: { url: data.url || "./" },
     })
   );
 });
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  e.waitUntil(clients.openWindow("./"));
+  const url = (e.notification.data && e.notification.data.url) || "./";
+  e.waitUntil(clients.openWindow(url));
 });
