@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+vapid.json
+notes.json
+subscriptions.json
+*.tmp

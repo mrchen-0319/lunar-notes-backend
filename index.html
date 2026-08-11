@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>农历记事本 · 按农历每年自动提醒</title>
+<meta name="theme-color" content="#c8443a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="农历记事">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1f2329; --sub:#8a9099;
+    --line:#e8eaed; --accent:#c8443a; --accent-soft:#fbe9e7; --ok:#2f9e6f;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px; margin:0 auto; padding:0 14px 60px;}
+  header{
+    position:sticky; top:0; z-index:5; background:var(--bg);
+    padding:14px 0 10px; display:flex; align-items:center; gap:8px;
+  }
+  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.5px;}
+  header .tag{font-size:12px; color:var(--sub); font-weight:400;}
+  header .spacer{flex:1}
+  .btn{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:9px; padding:7px 12px; font-size:14px; cursor:pointer;
+    transition:.15s; font-family:inherit;
+  }
+  .btn:hover{border-color:#cfd3d8}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn.primary:hover{background:#b23a31}
+  .btn.ghost{background:transparent; border-color:transparent; color:var(--sub);}
+  .btn.sm{padding:5px 9px; font-size:13px;}
+
+  /* top selector */
+  .topbar{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px; box-shadow:var(--shadow); display:flex; flex-wrap:wrap;
+    align-items:center; gap:8px;
+  }
+  .topbar label{font-size:13px; color:var(--sub); display:inline-flex; align-items:center; gap:4px; cursor:pointer;}
+  select, input[type=text], input[type=time]{
+    font-family:inherit; font-size:14px; color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff;
+  }
+  select:focus, input:focus{outline:none; border-color:var(--accent)}
+  .topbar .add{margin-left:auto;}
+
+  /* due banner */
+  .due{
+    margin-top:12px; background:var(--accent-soft); border:1px solid #f3c9c4;
+    border-radius:12px; padding:10px 12px; font-size:13px; color:#9a2b22;
+  }
+  .due b{color:var(--accent)}
+
+  /* list */
+  ul.list{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:10px;}
+  .note{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:13px 14px; box-shadow:var(--shadow); cursor:pointer; transition:.15s;
+  }
+  .note:hover{border-color:#d7dbe0; transform:translateY(-1px);}
+  .note .row1{display:flex; align-items:baseline; gap:8px;}
+  .note .lunar{font-weight:700; font-size:15px;}
+  .note .lunar .leap{color:var(--accent); font-size:12px; margin-right:2px;}
+  .note .title{font-size:15px; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .note .detail{color:var(--sub); font-size:13px; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .note .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; font-size:12px;}
+  .chip{background:#f1f3f5; color:#5b6168; border-radius:20px; padding:3px 9px;}
+  .chip.soon{background:var(--accent-soft); color:#9a2b22;}
+  .chip.bell{background:#eef4ff; color:#2f6bd8;}
+  .empty{text-align:center; color:var(--sub); font-size:14px; margin-top:40px;}
+
+  /* modal */
+  .mask{position:fixed; inset:0; background:rgba(20,24,30,.42); display:flex; align-items:flex-end; justify-content:center; z-index:20;}
+  .mask.hide{display:none}
+  @media(min-width:600px){.mask{align-items:center}}
+  .modal{
+    background:#fff; width:100%; max-width:560px; max-height:92vh; overflow:auto;
+    border-radius:18px 18px 0 0; padding:18px 18px 22px; box-shadow:0 -8px 30px rgba(0,0,0,.18);
+  }
+  @media(min-width:600px){.modal{border-radius:18px}}
+  .modal h2{margin:0 0 14px; font-size:16px;}
+  .field{margin-bottom:14px;}
+  .field > label{display:block; font-size:12.5px; color:var(--sub); margin-bottom:6px;}
+  .field .line{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .field input[type=text].title{width:100%; font-size:15px; padding:9px 10px;}
+  .editor{
+    border:1px solid var(--line); border-radius:10px; padding:10px; min-height:96px;
+    max-height:200px; overflow:auto; font-size:14px; line-height:1.6; background:#fff;
+  }
+  .editor:focus{outline:none; border-color:var(--accent)}
+  .toolbar{display:flex; gap:6px; margin-bottom:6px;}
+  .toolbar button{
+    border:1px solid var(--line); background:#fff; border-radius:7px; width:34px; height:30px;
+    cursor:pointer; font-size:14px; color:var(--ink);
+  }
+  .toolbar button:hover{border-color:#cfd3d8}
+  .modal .actions{display:flex; gap:10px; margin-top:6px;}
+  .modal .actions .spacer{flex:1}
+  .danger{color:var(--accent); border-color:#f0c6c1;}
+  .hint{font-size:12px; color:var(--sub); margin-top:4px;}
+
+  /* toast */
+  #toasts{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:50; display:flex; flex-direction:column; gap:8px; align-items:center;}
+  .toast{
+    background:#1f2329; color:#fff; padding:10px 16px; border-radius:10px; font-size:13.5px;
+    box-shadow:0 6px 20px rgba(0,0,0,.25); max-width:90vw; white-space:pre-line; text-align:center;
+    animation:pop .2s ease;
+  }
+  @keyframes pop{from{opacity:0; transform:translateY(8px)}to{opacity:1}}
+  footer{text-align:center; color:var(--sub); font-size:12px; margin-top:26px; line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>农历记事本</h1>
+    <span class="tag">按农历 · 每年自动提醒</span>
+    <span class="spacer"></span>
+    <button class="btn sm" id="btnBg" hidden>后台提醒</button>
+    <button class="btn sm" id="btnNotify">开启通知</button>
+  </header>
+
+  <section class="topbar">
+    <span>农历</span>
+    <select id="selMonth"></select>
+    <select id="selDay"></select>
+    <label><input type="checkbox" id="selLeap"> 闰月</label>
+    <button class="btn primary add" id="btnAdd">＋ 新建此日期记事</button>
+  </section>
+
+  <div id="dueBanner"></div>
+
+  <ul class="list" id="noteList"></ul>
+  <p class="empty" id="empty" hidden>还没有记事。在上方选好农历月、日，点「＋ 新建此日期记事」即可。</p>
+
+  <footer>
+    数据保存在本机。Windows 桌面版可启用「后台提醒」——关掉软件也会按真实公历时间弹通知；<br>
+    iPhone 安装 PWA 后在有后端推送时同样可后台提醒。
+  </footer>
+</div>
+
+<!-- editor -->
+<div class="mask hide" id="mask">
+  <div class="modal">
+    <h2 id="editorTitle">新建记事</h2>
+
+    <div class="field">
+      <label>① 农历日期</label>
+      <div class="line">
+        <select id="eMonth"></select>
+        <select id="eDay"></select>
+        <label><input type="checkbox" id="eLeap"> 闰月</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>② 标题（单行）</label>
+      <input type="text" class="title" id="eTitle" placeholder="例如：吃月饼、给奶奶打电话">
+    </div>
+
+    <div class="field">
+      <label>③ 详情（富文本，可换行 / 加粗）</label>
+      <div class="toolbar">
+        <button type="button" title="加粗" onclick="fmt('bold')"><b>B</b></button>
+        <button type="button" title="斜体" onclick="fmt('italic')"><i>I</i></button>
+        <button type="button" title="列表" onclick="fmt('insertUnorderedList')">• 列表</button>
+      </div>
+      <div class="editor" id="eDetail" contenteditable="true"></div>
+    </div>
+
+    <div class="field">
+      <label>④ 提醒设置</label>
+      <div class="line">
+        <select id="eAdvance">
+          <option value="0">不提醒</option>
+          <option value="1">提前 1 天</option>
+          <option value="3" selected>提前 3 天</option>
+          <option value="7">提前 7 天</option>
+        </select>
+        <span style="color:var(--sub);font-size:13px">固定时间</span>
+        <input type="time" id="eTime" value="09:00">
+      </div>
+      <div class="hint" id="eHint"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn danger" id="btnDelete" hidden>删除</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="btnCancel">取消</button>
+      <button class="btn primary" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="lunar.js"></script>
+<script>
+(async function(){
+  "use strict";
+  if(typeof Solar==="undefined" || typeof Lunar==="undefined"){
+    document.body.insertAdjacentHTML("beforeend",
+      '<p style="color:#c8443a;text-align:center;margin-top:40px">未能加载 lunar.js，请确认它与 index.html 在同一目录。</p>');
+    return;
+  }
+
+  const MONTHS = ["正月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","腊月"];
+  const DAYS   = ["初一","初二","初三","初四","初五","初六","初七","初八","初九","初十",
+                 "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十",
+                 "廿一","廿二","廿三","廿四","廿五","廿六","廿七","廿八","廿九","三十"];
+  const WK = ["日","一","二","三","四","五","六"];
+  const STORE_KEY = "lunar-notes-v1";
+
+  // 运行模式：EXE（由 loader 注入 __APP_MODE__）或 PWA
+  const MODE = window.__APP_MODE__ || "pwa";
+  let useAPI = false;     // 是否存在后端 /api/notes
+  let pushReady = false;
+  let notes = [];
+
+  /* ---------- storage（API 或 localStorage 自适应） ---------- */
+  async function detectAPI(){
+    try{
+      const r = await fetch("/api/notes", {cache:"no-store"});
+      useAPI = r.ok;
+    }catch(e){ useAPI = false; }
+    return useAPI;
+  }
+  async function load(){
+    if(useAPI){
+      try{ const r = await fetch("/api/notes", {cache:"no-store"}); return await r.json(); }
+      catch(e){}
+    }
+    try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }catch(e){ return []; }
+  }
+  async function save(arr){
+    if(useAPI){
+      try{
+        await fetch("/api/notes", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(arr)});
+        return;
+      }catch(e){}
+    }
+    localStorage.setItem(STORE_KEY, JSON.stringify(arr));
+  }
+
+  /* ---------- lunar helpers ---------- */
+  function solarOfLunar(month, day, leap, afterDate){
+    const d = new Date(afterDate.getFullYear(), afterDate.getMonth(), afterDate.getDate());
+    for(let i=0;i<7700;i++){
+      const y=d.getFullYear(), m=d.getMonth()+1, dd=d.getDate();
+      const l = Solar.fromYmd(y,m,dd).getLunar();
+      const lm=Math.abs(l.getMonth()), ld=l.getDay();
+      const isLeap = l.getMonth() < 0;
+      if(lm===month && ld===day && isLeap===leap) return new Date(y,m-1,dd);
+      d.setDate(d.getDate()+1);
+    }
+    return null;
+  }
+  function occOf(note){ return solarOfLunar(note.month, note.day, !!note.leap, new Date()); }
+  function triggerOf(note, occ){
+    const adv = (note.remind && note.remind.advance) || 0;
+    if(!adv) return null;
+    const [hh,mm] = ((note.remind && note.remind.time) || "09:00").split(":").map(Number);
+    const t = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), hh, mm, 0, 0);
+    t.setDate(t.getDate() - adv);
+    return t;
+  }
+  function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59); }
+
+  /* ---------- labels ---------- */
+  function lunarLabel(month, day, leap){ return (leap?"闰":"") + MONTHS[month-1] + DAYS[day-1]; }
+  function fmtDate(d){ return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
+  function fmtKey(d){ return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+  function stripHtml(h){ const t=document.createElement("div"); t.innerHTML=h||""; return (t.textContent||"").trim(); }
+  function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  /* ---------- selectors ---------- */
+  function fillSelect(sel, arr){
+    sel.innerHTML="";
+    arr.forEach((label,i)=>{
+      const o=document.createElement("option");
+      o.value=(i+1); o.textContent=label; sel.appendChild(o);
+    });
+  }
+  const selMonth=document.getElementById("selMonth"),
+        selDay=document.getElementById("selDay"),
+        selLeap=document.getElementById("selLeap");
+  fillSelect(selMonth, MONTHS);
+  fillSelect(selDay, DAYS);
+
+  /* ---------- list render ---------- */
+  const listEl=document.getElementById("noteList"),
+        emptyEl=document.getElementById("empty"),
+        dueBanner=document.getElementById("dueBanner");
+
+  function render(){
+    notes.forEach(n=>{ n._occ = occOf(n); });
+    const sorted = notes.slice().filter(n=>n._occ).sort((a,b)=>a._occ-b._occ);
+    listEl.innerHTML="";
+    if(notes.length===0){ emptyEl.hidden=false; listEl.hidden=true; }
+    else{
+      emptyEl.hidden=true; listEl.hidden=false;
+      sorted.forEach(n=>{
+        const occ=n._occ;
+        const days=Math.ceil((occ - new Date())/86400000);
+        const li=document.createElement("li");
+        li.className="note"; li.dataset.id=n.id;
+        const leapTag = n.leap?`<span class="leap">闰</span>`:"";
+        const det=stripHtml(n.detail);
+        let chips="";
+        chips+=`<span class="chip ${days<=7?'soon':''}">公历 ${fmtDate(occ)}（周${WK[occ.getDay()]}）· ${days<=0?'就是今天':('还有 '+days+' 天')}</span>`;
+        if(n.remind && n.remind.advance){
+          chips+=`<span class="chip bell">提前${n.remind.advance}天 ${n.remind.time} 提醒</span>`;
+        }
+        li.innerHTML=
+          `<div class="row1">${leapTag?`<span class="lunar">${leapTag}</span>`:''}<span class="lunar">${lunarLabel(n.month,n.day,n.leap)}</span><span class="title">${escapeHtml(n.title||'（无标题）')}</span></div>`+
+          (det?`<div class="detail">${n.detail}</div>`:"")+
+          `<div class="meta">${chips}</div>`;
+        li.addEventListener("click",()=>openEditor(n.id));
+        listEl.appendChild(li);
+      });
+    }
+  }
+
+  /* ---------- editor ---------- */
+  const mask=document.getElementById("mask");
+  const eMonth=document.getElementById("eMonth"), eDay=document.getElementById("eDay"), eLeap=document.getElementById("eLeap");
+  const eTitle=document.getElementById("eTitle"), eDetail=document.getElementById("eDetail");
+  const eAdvance=document.getElementById("eAdvance"), eTime=document.getElementById("eTime");
+  const eHint=document.getElementById("eHint"), btnDelete=document.getElementById("btnDelete");
+  fillSelect(eMonth, MONTHS); fillSelect(eDay, DAYS);
+
+  let editingId=null;
+  function openEditor(id){
+    editingId=id;
+    let n = id? notes.find(x=>x.id===id) : null;
+    if(n){
+      document.getElementById("editorTitle").textContent="编辑记事";
+      eMonth.value=n.month; eDay.value=n.day; eLeap.checked=!!n.leap;
+      eTitle.value=n.title||""; eDetail.innerHTML=n.detail||"";
+      eAdvance.value=n.remind?(n.remind.advance||0):0; eTime.value=(n.remind&&n.remind.time)||"09:00";
+      btnDelete.hidden=false;
+    }else{
+      document.getElementById("editorTitle").textContent="新建记事";
+      eMonth.value=selMonth.value; eDay.value=selDay.value; eLeap.checked=selLeap.checked;
+      eTitle.value=""; eDetail.innerHTML=""; eAdvance.value=3; eTime.value="09:00";
+      btnDelete.hidden=true;
+    }
+    updateHint();
+    mask.classList.remove("hide");
+  }
+  function closeEditor(){ mask.classList.add("hide"); editingId=null; }
+  function updateHint(){
+    const adv=+eAdvance.value;
+    if(!adv){ eHint.textContent="选择「不提醒」则该记事只展示、不推送。"; return; }
+    const occ=solarOfLunar(+eMonth.value, +eDay.value, eLeap.checked, new Date());
+    if(!occ){ eHint.textContent="该农历日期未来两年内未找到对应公历日。"; return; }
+    const tg=new Date(occ); tg.setDate(tg.getDate()-adv);
+    eHint.textContent=`下次：${lunarLabel(+eMonth.value,+eDay.value,eLeap.checked)} → 公历 ${fmtDate(occ)}（周${WK[occ.getDay()]}）；将在 ${fmtDate(tg)} ${eTime.value} 提醒。`;
+  }
+  [eMonth,eDay,eLeap,eAdvance,eTime].forEach(el=>el.addEventListener("change",updateHint));
+
+  document.getElementById("btnAdd").addEventListener("click",()=>openEditor(null));
+  document.getElementById("btnCancel").addEventListener("click",closeEditor);
+  mask.addEventListener("click",e=>{ if(e.target===mask) closeEditor(); });
+
+  document.getElementById("btnSave").addEventListener("click",async ()=>{
+    const title=eTitle.value.trim();
+    if(!title){ eTitle.focus(); toast("请填写标题"); return; }
+    const data={
+      month:+eMonth.value, day:+eDay.value, leap:eLeap.checked,
+      title, detail:eDetail.innerHTML,
+      remind:{ advance:+eAdvance.value, time:eTime.value }
+    };
+    if(editingId){
+      const n=notes.find(x=>x.id===editingId); Object.assign(n,data);
+    }else{
+      data.id="n"+Date.now()+Math.floor(Math.random()*1000);
+      data.createdAt=Date.now();
+      data.notified={};
+      notes.push(data);
+    }
+    await save(notes); closeEditor(); render(); await checkReminders();
+  });
+  btnDelete.addEventListener("click",async ()=>{
+    if(!editingId) return;
+    if(!confirm("确定删除这条记事？")) return;
+    notes=notes.filter(x=>x.id!==editingId); await save(notes); closeEditor(); render();
+  });
+
+  // rich text toolbar
+  window.fmt=function(c){ eDetail.focus(); document.execCommand(c,false,null); };
+
+  /* ---------- reminders ---------- */
+  function notify(note, occ){
+    const label=lunarLabel(note.month, note.day, note.leap);
+    const body=`${label} · ${note.title}\n公历 ${fmtDate(occ)}`;
+    // EXE 模式：桌面通知由系统守护进程负责，这里只做页内提示，避免重复弹窗
+    if(MODE!=="exe" && "Notification" in window && Notification.permission==="granted"){
+      try{ new Notification("农历提醒："+note.title,{body}); }catch(e){}
+    }
+    toast("🔔 "+note.title+"\n"+label+" · 公历 "+fmtDate(occ));
+  }
+  async function checkReminders(){
+    const now=new Date();
+    let changed=false;
+    notes.forEach(note=>{
+      const occ=occOf(note); if(!occ) return;
+      const tg=triggerOf(note,occ);
+      if(!tg) return;
+      const year=occ.getFullYear();
+      const notified=note.notified||{};
+      if(now>=tg && !(String(year) in notified)){
+        note.notified=notified; note.notified[String(year)]=new Date().toISOString();
+        changed=true;
+        notify(note,occ);
+      }
+    });
+    if(changed){ await save(notes); }
+    renderDueBanner();
+  }
+  function renderDueBanner(){
+    const now=new Date(); let items=[];
+    notes.forEach(note=>{
+      const occ=occOf(note); if(!occ) return;
+      const tg=triggerOf(note,occ);
+      if(tg && now>=tg && now<=endOfDay(occ)) items.push(note);
+    });
+    if(items.length){
+      dueBanner.className="due";
+      dueBanner.innerHTML="📌 待办提醒："+items.map(n=>`<b>${escapeHtml(n.title)}</b>（${lunarLabel(n.month,n.day,n.leap)}）`).join("、");
+    }else{ dueBanner.className=""; dueBanner.innerHTML=""; }
+  }
+
+  /* ---------- toast ---------- */
+  const toasts=document.getElementById("toasts");
+  function toast(msg){
+    const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+    toasts.appendChild(t);
+    setTimeout(()=>{ t.style.opacity="0"; t.style.transition="opacity .3s"; setTimeout(()=>t.remove(),300); }, 4200);
+  }
+
+  /* ---------- EXE 后台提醒开关 ---------- */
+  const btnBg=document.getElementById("btnBg");
+  async function refreshBg(){
+    if(MODE!=="exe"){ btnBg.hidden=true; return; }
+    try{
+      const r=await fetch("/api/task",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"status"})});
+      const j=await r.json();
+      btnBg.hidden=false; btnBg.dataset.status=j.status;
+      btnBg.textContent="后台提醒："+(j.status==="enabled"?"已启用":"未启用");
+    }catch(e){ btnBg.hidden=true; }
+  }
+  btnBg.addEventListener("click",async ()=>{
+    const action = btnBg.dataset.status==="enabled" ? "disable" : "enable";
+    const r=await fetch("/api/task",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action})});
+    const j=await r.json();
+    toast(j.ok ? (action==="enable"?"已启用后台提醒 ✅（关掉软件也会推送）":"已关闭后台提醒") : ("操作失败："+(j.detail||"")));
+    refreshBg();
+  });
+
+  /* ---------- 通知 / 推送订阅 ---------- */
+  document.getElementById("btnNotify").addEventListener("click",async ()=>{
+    if(!("Notification" in window)){ toast("当前环境不支持桌面通知"); return; }
+    const p = await Notification.requestPermission();
+    toast(p==="granted"?"已开启通知 ✅":"未授权通知");
+    if(p==="granted") await checkReminders();
+    if(useAPI) setupPush();
+  });
+
+  // Web Push 订阅（仅当后端提供 /api/vapid-public 时，即部署了 server.py）
+  async function setupPush(){
+    if(!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try{
+      const reg = await navigator.serviceWorker.ready;
+      const vres = await fetch("/api/vapid-public");
+      if(!vres.ok) return; // 没有后端推送能力，跳过
+      const key = await vres.text();
+      let sub = await reg.pushManager.getSubscription();
+      if(!sub){ sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:key}); }
+      await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)});
+      pushReady=true;
+    }catch(e){ console.warn("push setup failed", e); }
+  }
+
+  /* ---------- service worker (PWA 安装 / 离线 / 推送) ---------- */
+  if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
+    window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  }
+
+  /* ---------- boot ---------- */
+  await detectAPI();
+  notes = await load();
+  render(); renderDueBanner(); await checkReminders();
+  refreshBg();
+  if(useAPI) setupPush();
+  setInterval(()=>checkReminders(), 60000);
+  window.addEventListener("focus",()=>checkReminders());
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkReminders(); });
+})();
+</script>
+</body>
+</html>

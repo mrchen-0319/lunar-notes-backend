@@ -1,0 +1,6 @@
+# 农历记事本 —— Web Push 后端依赖（仅“iOS 关掉软件也推送”需要，部署到支持 Python 的服务器）
+flask
+apscheduler
+pywebpush
+py-vapid
+borax
