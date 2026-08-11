@@ -127,9 +127,12 @@ def push_to_all(title, body):
         try:
             webpush(
                 s,
-                data=json.dumps({"title": title, "body": body}),
+                data=json.dumps({"title": title, "body": body, "url": "./"}),
                 vapid_private_key=VAPID["private"],
                 vapid_claims={"sub": VAPID_EMAIL},
+                # 关键：TTL 默认 0 表示“设备此刻不在线就直接丢弃”。
+                # 手机锁屏时常处于低功耗、推送通道非实时，设 4 周可确保锁屏也能送达。
+                ttl=2419200,
             )
         except Exception as e:
             print("push error:", e)
