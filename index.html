@@ -101,10 +101,12 @@
     max-height:200px; overflow:auto; font-size:14px; line-height:1.6; background:#fff;
   }
   .editor:focus{outline:none; border-color:var(--accent)}
-  .toolbar{display:flex; gap:6px; margin-bottom:6px;}
+  .toolbar{display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;}
   .toolbar button{
-    border:1px solid var(--line); background:#fff; border-radius:7px; width:34px; height:30px;
+    border:1px solid var(--line); background:#fff; border-radius:7px;
+    min-width:34px; height:30px; padding:0 10px;
     cursor:pointer; font-size:14px; color:var(--ink);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .toolbar button:hover{border-color:#cfd3d8}
   .modal .actions{display:flex; gap:10px; margin-top:6px;}
