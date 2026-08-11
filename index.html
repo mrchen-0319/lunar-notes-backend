@@ -68,13 +68,14 @@
   .note{
     background:var(--card); border:1px solid var(--line); border-radius:14px;
     padding:13px 14px; box-shadow:var(--shadow); cursor:pointer; transition:.15s;
+    overflow:hidden;
   }
   .note:hover{border-color:#d7dbe0; transform:translateY(-1px);}
   .note .row1{display:flex; align-items:baseline; gap:8px;}
   .note .lunar{font-weight:700; font-size:15px;}
   .note .lunar .leap{color:var(--accent); font-size:12px; margin-right:2px;}
   .note .title{font-size:15px; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .note .detail{color:var(--sub); font-size:13px; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .note .detail{color:var(--sub); font-size:13px; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:break-word; word-break:break-word;}
   .note .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; font-size:12px;}
   .chip{background:#f1f3f5; color:#5b6168; border-radius:20px; padding:3px 9px;}
   .chip.soon{background:var(--accent-soft); color:#9a2b22;}
@@ -304,9 +305,13 @@
         emptyEl=document.getElementById("empty"),
         dueBanner=document.getElementById("dueBanner");
 
+  function lunarSortKey(n){
+    // 纯农历顺序：正月→腊月，同月按日，闰月排在同月之后（新增的记事按农历位置插入，不会总在最后）
+    return (n.month||0)*100 + Math.min(n.day||0,31) + (n.leap?0.5:0);
+  }
   function render(){
     notes.forEach(n=>{ n._occ = occOf(n); });
-    const sorted = notes.slice().filter(n=>n._occ).sort((a,b)=>a._occ-b._occ);
+    const sorted = notes.slice().sort((a,b)=> lunarSortKey(a)-lunarSortKey(b));
     listEl.innerHTML="";
     if(notes.length===0){ emptyEl.hidden=false; listEl.hidden=true; }
     else{
@@ -325,7 +330,7 @@
         }
         li.innerHTML=
           `<div class="row1">${leapTag?`<span class="lunar">${leapTag}</span>`:''}<span class="lunar">${lunarLabel(n.month,n.day,n.leap)}</span><span class="title">${escapeHtml(n.title||'（无标题）')}</span></div>`+
-          (det?`<div class="detail">${n.detail}</div>`:"")+
+          (det?`<div class="detail">${escapeHtml(det)}</div>`:"")+
           `<div class="meta">${chips}</div>`;
         li.addEventListener("click",()=>openEditor(n.id));
         listEl.appendChild(li);
