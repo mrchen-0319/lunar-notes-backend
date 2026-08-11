@@ -232,6 +232,10 @@
 
   // 运行模式：EXE（由 loader 注入 __APP_MODE__）或 PWA
   const MODE = window.__APP_MODE__ || "pwa";
+  // 后端基地址：CloudStudio 静态版通过 __BACKEND_URL__ 指向 Railway 后端，实现云端存储 + 推送；
+  // Railway 同源版此处为空，走同源 /api/*。
+  const BACKEND = window.__BACKEND_URL__ || "";
+  const apiURL = (p) => BACKEND + p;
   let useAPI = false;     // 是否存在后端 /api/notes
   let pushReady = false;
   let notes = [];
@@ -239,22 +243,32 @@
   /* ---------- storage（API 或 localStorage 自适应） ---------- */
   async function detectAPI(){
     try{
-      const r = await fetch("/api/notes", {cache:"no-store"});
+      const r = await fetch(apiURL("/api/notes"), {cache:"no-store"});
       useAPI = r.ok;
     }catch(e){ useAPI = false; }
     return useAPI;
   }
   async function load(){
     if(useAPI){
-      try{ const r = await fetch("/api/notes", {cache:"no-store"}); return await r.json(); }
-      catch(e){}
+      try{
+        const r = await fetch(apiURL("/api/notes"), {cache:"no-store"});
+        let arr = await r.json();
+        // 一次性迁移：云端为空且本机 localStorage 有数据 -> 自动上传到云端，避免删除 PWA 丢数据
+        if(Array.isArray(arr) && arr.length===0){
+          try{
+            const local = JSON.parse(localStorage.getItem(STORE_KEY)) || [];
+            if(local.length){ arr = local; await save(arr); }
+          }catch(e){}
+        }
+        if(Array.isArray(arr)) return arr;
+      }catch(e){}
     }
     try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }catch(e){ return []; }
   }
   async function save(arr){
     if(useAPI){
       try{
-        await fetch("/api/notes", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(arr)});
+        await fetch(apiURL("/api/notes"), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(arr)});
         return;
       }catch(e){}
     }
@@ -528,12 +542,12 @@
     if(!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     try{
       const reg = await navigator.serviceWorker.ready;
-      const vres = await fetch("/api/vapid-public");
+      const vres = await fetch(apiURL("/api/vapid-public"));
       if(!vres.ok) return; // 没有后端推送能力，跳过
       const key = await vres.text();
       let sub = await reg.pushManager.getSubscription();
       if(!sub){ sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:key}); }
-      await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)});
+      await fetch(apiURL("/api/push/subscribe"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)});
       pushReady=true;
     }catch(e){ console.warn("push setup failed", e); }
   }
