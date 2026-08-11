@@ -47,6 +47,31 @@ VAPID = get_vapid()
 
 
 # --------------------------------------------------------------------------
+# CORS：允许 CloudStudio 静态 PWA 等跨域前端调用本后端
+# （notes 读写、Web Push 订阅、vapid 公钥获取）。
+# 动态回显 Origin（本项目无 Cookie/登录态，回显任意来源安全且最省心）。
+# --------------------------------------------------------------------------
+@app.after_request
+def _cors(resp):
+    origin = request.headers.get("Origin")
+    if origin:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Max-Age"] = "86400"
+    return resp
+
+
+@app.route("/api/notes", methods=["OPTIONS"])
+@app.route("/api/push/subscribe", methods=["OPTIONS"])
+@app.route("/api/push/unsubscribe", methods=["OPTIONS"])
+@app.route("/api/vapid-public", methods=["OPTIONS"])
+@app.route("/api/task", methods=["OPTIONS"])
+def _cors_preflight():
+    return ("", 204)
+
+
+# --------------------------------------------------------------------------
 # 静态资源
 # --------------------------------------------------------------------------
 @app.route("/")
