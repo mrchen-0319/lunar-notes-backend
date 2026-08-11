@@ -47,15 +47,15 @@ self.addEventListener("push", (e) => {
   const scope = self.registration.scope;
   const icon = new URL("icon-512.png", scope).href;
   const badge = new URL("icon-192.png", scope).href;
+  // iOS 对 requireInteraction/vibrate 支持有限，去掉它们以确保锁屏能正常显示；
+  // tag + renotify 已足够让每次提醒重新弹出来，避免被系统折叠后不提示。
   e.waitUntil(
     self.registration.showNotification(data.title || "农历提醒", {
       body: data.body || "",
       icon,
       badge,
-      tag: "lunar-notes",     // 同类通知聚合，避免刷屏
-      renotify: true,         // 同 tag 也重新提示，确保锁屏可见
-      requireInteraction: true, // 尽量保持可见
-      vibrate: [200, 100, 200],
+      tag: "lunar-notes",
+      renotify: true,
       timestamp: Date.now(),
       data: { url: data.url || "./" },
     })
