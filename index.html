@@ -149,8 +149,12 @@
   <p class="empty" id="empty" hidden>还没有记事。在上方选好农历月、日，点「＋ 新建此日期记事」即可。</p>
 
   <footer>
+    <div id="storeMode" class="hint" style="margin-bottom:8px"></div>
     数据保存在本机。Windows 桌面版可启用「后台提醒」——关掉软件也会按真实公历时间弹通知；<br>
-    iPhone 安装 PWA 后在有后端推送时同样可后台提醒。
+    iPhone 安装 PWA 后在有后端推送时同样可后台提醒。<br>
+    <button class="btn sm" id="btnExport">导出备份</button>
+    <button class="btn sm" id="btnImport">导入备份</button>
+    <input type="file" id="fileImport" accept="application/json,.json" hidden>
   </footer>
 </div>
 
@@ -458,6 +462,39 @@
     setTimeout(()=>{ t.style.opacity="0"; t.style.transition="opacity .3s"; setTimeout(()=>t.remove(),300); }, 4200);
   }
 
+  /* ---------- 备份（导出 / 导入）---------- */
+  // 作用：CloudStudio 静态版数据存在本机，删掉 PWA 会清空；用备份可恢复。
+  // Railway 版数据在云端，删除 App 不丢，但备份可防止服务端重置。
+  const storeModeEl=document.getElementById("storeMode");
+  function updateStoreMode(){
+    if(!storeModeEl) return;
+    storeModeEl.textContent = useAPI
+      ? "✅ 数据已同步到云端（删掉 App 也不会丢）"
+      : "⚠️ 数据仅存本机，删除 App 会丢失，建议点「导出备份」";
+  }
+  document.getElementById("btnExport").addEventListener("click",()=>{
+    const blob=new Blob([JSON.stringify(notes,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download="lunar-notes-backup.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    toast("已导出备份文件");
+  });
+  document.getElementById("btnImport").addEventListener("click",()=>document.getElementById("fileImport").click());
+  document.getElementById("fileImport").addEventListener("change",async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    try{
+      const imported=JSON.parse(await f.text());
+      if(!Array.isArray(imported)) throw new Error("文件格式不正确");
+      const map=new Map(); notes.forEach(n=>map.set(n.id,n));
+      imported.forEach(n=>{ if(n && n.id) map.set(n.id,n); });
+      notes=[...map.values()];
+      await save(notes); render(); updateStoreMode();
+      toast("已导入备份（"+imported.length+" 条）");
+    }catch(err){ toast("导入失败："+err.message); }
+    e.target.value="";
+  });
+
   /* ---------- EXE 后台提醒开关 ---------- */
   const btnBg=document.getElementById("btnBg");
   async function refreshBg(){
@@ -508,6 +545,7 @@
 
   /* ---------- boot ---------- */
   await detectAPI();
+  updateStoreMode();
   notes = await load();
   render(); renderDueBanner(); await checkReminders();
   refreshBg();
